@@ -1,0 +1,120 @@
+﻿@if (ModalVisible)
+{
+    <SfDialog Width="40%" Height="auto" IsModal="true" ShowCloseIcon="true">
+        <DialogTemplates>
+            <Header>Add Forecast</Header>
+            <Content>
+                <EditForm Model="@FormModel" OnValidSubmit="@OnAddForecastItemSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="form-row">
+                        <label>Date</label><br />
+                        <SfDateTimePicker TValue="DateTime" @bind-Value="@FormModel.Date" Placeholder="Select a date and time" Width="100%" />
+                        <ValidationMessage For="@(() => FormModel.Date)" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Weather Summary</label>
+                        <SfDropDownList TValue="string" TItem="WeatherSummaryItem" Placeholder="Select a weather summary" @bind-Value="@FormModel.SummaryItem" DataSource="@WeatherSummaries">
+                            <DropDownListFieldSettings Value="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => FormModel.SummaryItem)" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Temperature</label><br />
+                        <SfNumericTextBox TValue="int" @bind-Value="@FormModel.Temperature" Width="100%" />
+                        <ValidationMessage For="@(() => FormModel.Temperature)" />
+                    </div>
+                    <div class="form-row">
+                        <SfButton CssClass="add-forecast-btn" type="submit" IsPrimary="true">Submit</SfButton>
+                    </div>
+                </EditForm>
+            </Content>
+        </DialogTemplates>
+        <DialogEvents OnClose="Close" OnOverlayClick="Close" />
+        <DialogAnimationSettings Effect="@DialogEffect.FadeZoom" />
+    </SfDialog>
+}
+
+@code
+{
+    #nullable disable
+
+    public class WeatherSummaryItem
+    {
+        public string Name { get; set; }
+        public WeatherSummary Weather { get; set; }
+    }
+
+    public class FutureDateRequired : ValidationAttribute
+    {
+        public FutureDateRequired(string errorMessage) : base(errorMessage) { }
+        public override bool IsValid(object value) => (value is not null) && ((DateTime)value >= DateTime.Now.AddMinutes(-DateTime.Now.Minute));
+    }
+
+    public class AddForecastModel
+    {
+        [FutureDateRequired("Date must be in the future")]
+        public DateTime Date { get; set; } = DateTime.Now;
+
+        [Required(AllowEmptyStrings = false, ErrorMessage = "You must select a Weather Summary")]
+        public string SummaryItem { get; set; }
+
+        [Required, Range(-20, 55, ErrorMessage = "The field {0} must be greater or equal than {1} and lower or equal than {2}.")]
+        public int Temperature { get; set; } = 10;
+    }
+
+    [Inject]
+    public WeatherForecastService ForecastService { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    [Parameter]
+    public bool ModalVisible { get; set; }
+
+    public AddForecastModel FormModel { get; set; } = new();
+
+    public void Show()
+    {
+        ModalVisible = true;
+        FormModel = new();
+    }
+
+    public void Close()
+    {
+        ModalVisible = false;
+        FormModel = new();
+    }
+
+    public IEnumerable<WeatherSummaryItem> WeatherSummaries = Enum
+        .GetValues(typeof(WeatherSummary))
+        .OfType<WeatherSummary>()
+        .Select(x => new WeatherSummaryItem
+        {
+            Name = WeatherSummaryHelper.DisplayName(x),
+            Weather = x
+        });
+
+    public async Task OnAddForecastItemSubmit()
+    {
+        if (FormModel.SummaryItem is null)
+        {
+            return;
+        }
+
+        WeatherForecast forecast = new()
+        {
+            Date = FormModel.Date,
+            Summary = WeatherSummaries.First(a => a.Name == FormModel.SummaryItem).Weather,
+            TemperatureC = FormModel.Temperature
+        };
+
+        var id = await ForecastService.UpsertWeatherForecastAsync(forecast);
+        Close();
+        NavigationManager.NavigateTo($"/details/{id}");
+    }
+
+#nullable restore
+}

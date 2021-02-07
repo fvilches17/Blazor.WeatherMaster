@@ -1,0 +1,190 @@
+﻿@page "/"
+
+<SfTab HeaderPlacement="HeaderPosition.Top">
+    <TabItems>
+        <TabItem>
+            <ChildContent>
+                <TabHeader Text="Calendar" />
+            </ChildContent>
+            <ContentTemplate>
+                @if (ForecastsCalendarData is not null)
+                {
+                    <div class="weather-data-container">
+                        <SfSchedule TValue="WeatherCalendarData" @bind-SelectedDate="@DateValue" Height="100%" Width="auto" CssClass="schedule-cell-dimension">
+                            <ScheduleEventSettings DataSource="@ForecastsCalendarData" EnableTooltip="@EnableCalEventToolTip" />
+                            <ScheduleEvents TValue="WeatherCalendarData" Navigating="ToggleCalEventTooltip" ActionCompleted="OnActionCompleted" />
+                            <ScheduleViews>
+                                <ScheduleView Option="View.Agenda" ShowWeekend="true" />
+                                <ScheduleView Option="View.Month" ShowWeekend="true" MaxEventsPerRow="3" />
+                            </ScheduleViews>
+                        </SfSchedule>
+                    </div>
+                }
+            </ContentTemplate>
+        </TabItem>
+        <TabItem>
+            <ChildContent>
+                <TabHeader Text="Grid" />
+            </ChildContent>
+            <ContentTemplate>
+                @if (ForecastsTableItems is not null)
+                {
+                    <div class="weather-data-container">
+                        <SfGrid @ref="DefaultGrid" DataSource="@ForecastsTableItems" AllowPaging="true" AllowSorting="true" AllowExcelExport="true" Toolbar=@Tool RowHeight="60" Height="100%">
+                            <GridPageSettings PageSize="15" />
+                            <GridEvents OnToolbarClick="ToolbarClickHandler" RowSelected="OnGridRowSelect" TValue="WeatherTableItem" />
+                            <GridColumns>
+                                <GridColumn Field=@nameof(WeatherTableItem.Date)>
+                                    <HeaderTemplate>
+                                        <h3>Date</h3>
+                                    </HeaderTemplate>
+                                </GridColumn>
+                                <GridColumn Field=@nameof(WeatherTableItem.TemperatureC)>
+                                    <HeaderTemplate>
+                                        <h3>Temp (C)</h3>
+                                    </HeaderTemplate>
+                                </GridColumn>
+                                <GridColumn Field=@nameof(WeatherTableItem.TemperatureF)>
+                                    <HeaderTemplate>
+                                        <h3>Temp (F)</h3>
+                                    </HeaderTemplate>
+                                </GridColumn>
+                                <GridColumn Field=@nameof(WeatherTableItem.Summary)>
+                                    <HeaderTemplate>
+                                        <h3>Summary</h3>
+                                    </HeaderTemplate>
+                                </GridColumn>
+                            </GridColumns>
+                        </SfGrid>
+                    </div>
+                }
+            </ContentTemplate>
+        </TabItem>
+    </TabItems>
+</SfTab>
+
+@code {
+    #nullable disable
+
+    public SfGrid<WeatherTableItem> DefaultGrid;
+
+    public class WeatherCalendarData
+    {
+        public int Id { get; set; }
+        public string Subject { get; set; }
+        public string Location { get; set; }
+        public string Description { get; set; }
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public bool IsAllDay { get; set; }
+        public int TempC { get; set; }
+    }
+
+    public class WeatherTableItem
+    {
+        public int Id { get; set; }
+        public string Date { get; set; }
+        public string TemperatureC { get; set; }
+        public string TemperatureF { get; set; }
+        public string Summary { get; set; }
+    }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    [Inject]
+    public WeatherForecastService ForecastService { get; set; }
+
+    public DateTime DateValue { get; set; } = DateTime.Now;
+
+    public bool EnableCalEventToolTip { get; set; }
+
+    public List<WeatherCalendarData> ForecastsCalendarData;
+
+    public List<WeatherTableItem> ForecastsTableItems;
+
+    public List<string> Tool = new() { "Search", "ExcelExport" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var forecasts = await ForecastService.GetForecastsAsync();
+        ReloadCalendarData(forecasts);
+        ReleadGridData(forecasts);
+    }
+
+    private void ReleadGridData(IEnumerable<WeatherForecast> items) =>
+        ForecastsTableItems = items.OrderBy(e => e.Date).Select(x => new WeatherTableItem
+        {
+            Id = x.Id,
+            Date = x.Date.ToString("MM/dd/yyyy h:mm tt"),
+            TemperatureC = x.TemperatureC.ToString(),
+            TemperatureF = x.TemperatureF.ToString(),
+            Summary = $"{WeatherSummaryHelper.EmojiName(x.Summary)} {WeatherSummaryHelper.DisplayName(x.Summary)}",
+        }).ToList();
+
+    private void ReloadCalendarData(IEnumerable<WeatherForecast> items) =>
+        ForecastsCalendarData = items.OrderBy(e => e.Date).Select(x => new WeatherCalendarData
+        {
+            Id = x.Id,
+            Subject = $"{WeatherSummaryHelper.EmojiName(x.Summary)} {x.TemperatureC}C° | {x.TemperatureF}F°",
+            Location = "Auckland",
+            Description = WeatherSummaryHelper.DisplayName(x.Summary),
+            StartTime = x.Date,
+            EndTime = x.Date.AddHours(4),
+            IsAllDay = false,
+            TempC = x.TemperatureC
+        }).ToList();
+
+    private void ToggleCalEventTooltip(NavigatingEventArgs args)
+    {
+        if (args.Action is not "view") return;
+        EnableCalEventToolTip = args.CurrentView is View.Month;
+    }
+
+    private void OnGridRowSelect(RowSelectEventArgs<WeatherTableItem> args) => NavigationManager.NavigateTo($"/details/{args.Data.Id}");
+
+    public async Task ExcelExport() => await DefaultGrid.ExcelExport();
+
+    public async Task ToolbarClickHandler(ClickEventArgs args)
+    {
+        if (args.Item.Text is "Excel Export")
+        {
+            await DefaultGrid.ExcelExport();
+        }
+    }
+
+    private async Task OnActionCompleted(Syncfusion.Blazor.Schedule.ActionEventArgs<WeatherCalendarData> args)
+    {
+        static WeatherForecast MapForecast(WeatherCalendarData calItem) => new()
+        {
+            Id = calItem.Id,
+            Date = calItem.StartTime,
+            Summary = Enum.Parse<WeatherSummary>(calItem.Description),
+            TemperatureC = calItem.TempC
+        };
+
+        switch (args.ActionType)
+        {
+            case ActionType.EventCreate:
+                var newItem = MapForecast(args.AddedRecords.First());
+                await ForecastService.UpsertWeatherForecastAsync(newItem);
+                break;
+
+            case ActionType.EventChange:
+                var updatedItem = MapForecast(args.ChangedRecords.First());
+                await ForecastService.UpsertWeatherForecastAsync(updatedItem);
+                break;
+
+            case ActionType.EventRemove:
+                await ForecastService.DeleteWeatherForecastAsync(args.DeletedRecords.First().Id);
+                break;
+        }
+
+        var items = await ForecastService.GetForecastsAsync();
+        ReloadCalendarData(items);
+        ReleadGridData(items);
+        StateHasChanged();
+    }
+
+#nullable restore
+}

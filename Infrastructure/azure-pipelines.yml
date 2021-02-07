@@ -1,0 +1,75 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+parameters:
+  - name: runResourceGroupUpdate
+    type: boolean
+    default: true
+
+stages:
+- stage: Test
+  jobs:
+  - job:
+    steps:
+    - task: DotNetCoreCLI@2
+      name: dotnet_test
+      inputs:
+        command: 'test'
+
+- stage: Publish
+  jobs:
+  - job:
+    steps:
+    - task: gitversion/setup@0
+      name: GitVersion_Setup
+      inputs:
+        versionSpec: '5.x'
+      
+    - task: gitversion/execute@0
+      name: GitVersion_UpdateBuildNumber
+
+    - task: DotNetCoreCLI@2
+      name: dotnet_publish
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: 'WeatherMaster/WeatherMaster.csproj'
+        arguments: '-o $(Build.ArtifactStagingDirectory) -f net5.0 -r linux-x64 -c release -p:Description=$(Build.BuildNumber) --self-contained'
+
+    - task: PublishBuildArtifacts@1
+      name: Artifact_Publish
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+- stage: Deploy_Dev
+  jobs:
+  - template: AzurePipelineTemplates/deploy.yml
+    parameters:
+      environment: Development
+      azureSubscription: Plexure Internal (491eaf59-33bf-4223-800d-079e57e953fa)
+      azureSubscriptionId: 491eaf59-33bf-4223-800d-079e57e953fa
+      location: Australia East
+      runResourceGroupUpdate: ${{ parameters.runResourceGroupUpdate }}
+      resourceGroupTags: client=internal environment=dev Owner=Plexure system=dev
+      resourceGroupName: FrontEndTournament-Blazor-Dev-Rg
+      hostingPlanName: FrontEndTournament-Blazor-Dev-ASP
+      weatherMasterWebAppName: dev-blazorweathermaster
+
+- stage: Deploy_QA
+  jobs:
+  - template: AzurePipelineTemplates/deploy.yml
+    parameters:
+      environment: QA
+      azureSubscription: Plexure Internal (491eaf59-33bf-4223-800d-079e57e953fa)
+      azureSubscriptionId: 491eaf59-33bf-4223-800d-079e57e953fa
+      location: Australia East
+      runResourceGroupUpdate: ${{ parameters.runResourceGroupUpdate }}
+      resourceGroupTags: client=internal environment=qa Owner=Plexure system=qa
+      resourceGroupName: FrontEndTournament-Blazor-QA-Rg
+      hostingPlanName: FrontEndTournament-Blazor-QA-ASP
+      weatherMasterWebAppName: qa-blazorweathermaster

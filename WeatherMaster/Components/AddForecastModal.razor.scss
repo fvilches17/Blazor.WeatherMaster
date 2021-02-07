@@ -1,0 +1,17 @@
+﻿.form-row {
+    margin: 0;
+    margin-bottom: 20px;
+    display: block;
+    width: 100%;
+    color: slategrey;
+}
+
+.add-forecast-footer {
+    text-align: left;
+    margin-top: -25px;
+    margin-bottom: 15px;
+}
+
+::deep .add-forecast-btn {
+    padding: 8px;
+}

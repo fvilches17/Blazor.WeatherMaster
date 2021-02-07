@@ -1,0 +1,67 @@
+﻿@inherits LayoutComponentBase
+
+<div class="sidebar-icons">
+    <SfButton CssClass="@_hamburgerIconDisplay" IconCss="e-icons menu" @onclick="@OnMenuIconClick" />
+    <SfButton CssClass="@_closeIconDisplay" IconCss="e-icons close" @onclick="@OnCloseIconClick" />
+</div>
+
+<div>
+    <SfSidebar Width="350px" Position="SidebarPosition.Right" @bind-IsOpen="@_showSideBar">
+        <ChildContent>
+            <h1 class="app-title">Blazor</h1>
+            
+            <span class="build-info">
+                @Environment.EnvironmentName | @AssemblyHelper.GetAssemblyVersion()
+            </span>
+
+            <NavLink href="" Match="NavLinkMatch.All">
+                <img src="img/blazor-logo.png" alt="blazor-logo"/>
+            </NavLink>
+            
+            <div title="Add Forecast">
+                <SfButton CssClass="e-round add-forecast-btn" IconCss="e-icons e-plus-icon" IsPrimary="true" @onclick="ForecastModalDialog.Show" />
+            </div>
+        </ChildContent>
+    </SfSidebar>
+    
+    <main>
+        @Body
+    </main>
+    
+    <AddForecastModal @ref="ForecastModalDialog" />
+</div>
+
+@code {
+    #nullable disable
+
+    private bool _showSideBar = true;
+    private string _hamburgerIconDisplay = "d-none";
+    private string _closeIconDisplay = string.Empty;
+
+    [Inject]
+    public AssemblyHelper AssemblyHelper { get; init; }
+
+    [Inject]
+    public IWebHostEnvironment Environment { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    public AddForecastModal ForecastModalDialog { get; set; }
+
+    public void OnMenuIconClick()
+    {
+        _showSideBar = true;
+        _hamburgerIconDisplay = "d-none";
+        _closeIconDisplay = string.Empty;
+    }
+
+    public void OnCloseIconClick()
+    {
+        _showSideBar = false;
+        _hamburgerIconDisplay = string.Empty;
+        _closeIconDisplay = "d-none";
+    }
+
+#nullable restore
+}

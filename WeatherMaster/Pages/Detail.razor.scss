@@ -1,0 +1,24 @@
+﻿.detail-card-container {
+    margin: 10vh auto;
+    width: 40vw;
+}
+
+::deep .detail-card {
+    background-image: url('/img/man-holding-on-to-tree.jpg');
+    background-repeat: no-repeat;
+    background-size: 55%;
+    background-position-x: 115%;
+    background-position-y: 90%;
+    padding: 30px;
+}
+
+::deep .e-card .e-card-header .e-card-header-caption .e-card-header-title {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+::deep .e-button {
+    margin-top: 25px;
+    display: block;
+    margin-bottom: 10px;
+}

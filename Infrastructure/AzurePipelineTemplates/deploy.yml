@@ -1,0 +1,75 @@
+parameters:
+- name: location
+  type: string
+- name: environment
+  type: string
+- name: azureSubscription
+  type: string
+- name: azureSubscriptionId
+  type: string
+- name: runResourceGroupUpdate
+  type: boolean
+- name: resourceGroupName
+  type: string
+- name: resourceGroupTags
+  type: string
+- name: weatherMasterWebAppName
+  type: string
+- name: hostingPlanName
+  type: string
+
+
+jobs:
+- deployment:
+  environment: FrontEndTournament-Blazor-${{ parameters.environment }}
+  strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          - task: AzureCLI@2
+            name: ResourceGroup_EnsureCreated
+            condition: and(succeeded(), ${{ parameters.runResourceGroupUpdate }})
+            inputs:
+              azureSubscription: '${{ parameters.azureSubscription }}'
+              scriptType: 'pscore'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                $rgExists = az group exists -n ${{ parameters.resourceGroupName }}
+                if ($rgExists -eq 'false') {
+                    az group create --name ${{ parameters.resourceGroupName }} --location "${{ parameters.location }}" --tags ${{ parameters.resourceGroupTags }}
+                    Write-Host "az resource group created"
+                }
+              failOnStandardError: true
+
+          - task: AzureResourceManagerTemplateDeployment@3
+            name: ResourceGroup_Update
+            condition: and(succeeded(), ${{ parameters.runResourceGroupUpdate }})
+            inputs:
+              deploymentScope: 'Resource Group'
+              azureResourceManagerConnection: '${{ parameters.azureSubscription }}'
+              subscriptionId: '${{ parameters.azureSubscriptionId }}'
+              action: 'Create Or Update Resource Group'
+              resourceGroupName: '${{ parameters.resourceGroupName }}'
+              location: '${{ parameters.location }}'
+              templateLocation: 'Linked artifact'
+              csmFile: 'Infrastructure/arm-template.json'
+              overrideParameters: |
+                -weatherMasterWebAppName ${{ parameters.weatherMasterWebAppName }} 
+                -weatherMasterWebAppAspNetCoreEnvironment ${{ parameters.environment }} 
+                -hostingPlanName ${{ parameters.hostingPlanName }}
+              deploymentMode: 'Complete'
+
+          - download: current
+            name: Artifact_Download
+            artifact: drop
+            patterns: '**/*'
+          
+          - task: AzureWebApp@1
+            name: WeatherMasterWebApp_Deploy
+            inputs:
+              azureSubscription: '${{ parameters.azureSubscription }}'
+              appType: 'webAppLinux'
+              appName: '${{ parameters.weatherMasterWebAppName }}'
+              package: '$(Pipeline.Workspace)/drop/WeatherMaster.zip'

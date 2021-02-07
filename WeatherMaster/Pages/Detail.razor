@@ -1,0 +1,49 @@
+﻿@page "/details/{id:int}"
+
+<div class="detail-card-container">
+    @if(Forecast is null) 
+    {
+        <SfSpinner Size="40" Type="SpinnerType.Material" Visible="@_spinnerVisible" Label="Loading Forecast Details..."/>
+    } 
+    else
+    {
+        <SfCard CssClass="detail-card">
+            <CardHeader Title="Weather Forecast" />
+            <CardContent EnableSeperator="true">
+                <p><strong>Date</strong> @Forecast.Date</p>
+                <p><strong>Summary</strong> @(WeatherSummaryHelper.DisplayName(Forecast.Summary)) @(WeatherSummaryHelper.EmojiName(Forecast.Summary))</p>
+                <p><strong>Temperature C</strong> @(Forecast.TemperatureC)° </p>
+                <p><strong>Temperature F</strong> @(Forecast.TemperatureF)° </p>
+                <SfButton CssClass="e-button" OnClick="@OnBackButtonPressed" IsPrimary="true">Back</SfButton>
+            </CardContent>
+        </SfCard>
+    }
+</div>
+
+@code {
+    #nullable disable
+
+    [Parameter]
+    public int Id { get; set; }
+
+    [Inject]
+    public WeatherForecastService ForecastService { get; set; }
+
+    [Inject]
+    public NavigationManager NavigationManager { get; set; }
+
+    public WeatherForecast Forecast { get; set; }
+
+    private bool _spinnerVisible = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(1_000); // Let's simulate a 'real' load time
+        Forecast = await ForecastService.GetForecastByIdAsync(Id);
+        _spinnerVisible = false;
+    }
+
+    public void OnBackButtonPressed() => NavigationManager.NavigateTo("/");
+
+#nullable restore
+}
